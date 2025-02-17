@@ -7,13 +7,34 @@ static void VK_ASSERT(bool check) {
     if (!check) exit(EXIT_FAILURE);
 }
 
-//#define VK_CHECK(value) \  if ( value != VK_SUCCESS ) \    { VK_ASSERT(false); return false; }
-//#define VK_CHECK_RET(value) \  if ( value != VK_SUCCESS ) \    { VK_ASSERT(false); return value; }
+#define VK_CHECK(value) \  if ( value != VK_SUCCESS ) \    { VK_ASSERT(false); return false; }
+#define VK_CHECK_RET(value) \  if ( value != VK_SUCCESS ) \    { VK_ASSERT(false); return value; }
 
 struct SwapchainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities = {};
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
+};
+
+struct VulkanInstance {
+    VkInstance instance;
+    VkSurfaceKHR surface;
+    VkDebugUtilsMessengerEXT messenger;
+    VkDebugReportCallbackEXT reportCallback;
+};
+
+struct VulkanRenderDevice {
+    VkDevice device;
+    VkQueue graphicsQueue;
+    VkPhysicalDevice physicalDevice;
+    uint32_t graphicsFamily;
+    VkSemaphore semaphore;
+    VkSemaphore renderSemaphore;
+    VkSwapchainKHR swapchain;
+    std::vector<VkImage> swapchainImages;
+    std::vector<VkImageView> swapchainImageViews;
+    VkCommandPool commandPool;
+    std::vector<VkCommandBuffer> commandBuffers;
 };
 
 const std::vector<const char*> layers = {
@@ -33,6 +54,60 @@ const std::vector<const char*> exts = {
      VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
      VK_EXT_DEBUG_REPORT_EXTENSION_NAME
 };
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL 
+vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* callbackData, void* userData) {
+    printf("Validation layer: %s\n", callbackData->pMessage);
+    return VK_FALSE;
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL
+vulkanDebugReportCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object, size_t location, int32_t messageCode, const char* pLayerPrefix, const char* pMessage, void* UserData) {
+    if (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT)
+        return VK_FALSE;
+    printf("Debug callback (%s): %s\n", pLayerPrefix, pMessage);
+    return VK_FALSE;
+}
+
+bool setupDebugCallbacks(VkInstance instance, VkDebugUtilsMessengerEXT* messenger, VkDebugReportCallbackEXT* reportCallback) {
+    const VkDebugUtilsMessengerCreateInfoEXT ci1 = {
+    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+    .pNext = nullptr,
+    .flags = 0,
+    .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+    .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,    
+    .pfnUserCallback = &vulkanDebugCallback,
+    .pUserData = nullptr
+    };
+
+    VK_ASSERT(vkCreateDebugUtilsMessengerEXT(instance, &ci1, nullptr, messenger) == VK_SUCCESS);
+
+    const VkDebugReportCallbackCreateInfoEXT ci2 = { 
+        .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    
+        .pNext = nullptr,    
+        .flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT,    
+        .pfnCallback = &vulkanDebugReportCallback,
+        .pUserData = nullptr 
+    };
+    VK_ASSERT(vkCreateDebugReportCallbackEXT(instance, &ci2, nullptr, reportCallback) == VK_SUCCESS);
+    return true;
+}
+
+bool setVkObjectName(VulkanRenderDevice& vkDev, void* object, VkObjectType objType, const char* name) {
+    VkDebugUtilsObjectNameInfoEXT nameInfo = { 
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = nullptr,
+        .objectType = objType,
+        .objectHandle = (uint64_t)object,
+        .pObjectName = name 
+    };
+    return (vkSetDebugUtilsObjectNameEXT(vkDev.device, &nameInfo) == VK_SUCCESS);
+}
+
+VkResult createSemaphore(VkDevice device, VkSemaphore* outSemaphore) {
+    const VkSemaphoreCreateInfo ci = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+    return vkCreateSemaphore(device, &ci, nullptr, outSemaphore);
+}
 
 SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
     SwapchainSupportDetails details;
@@ -207,6 +282,66 @@ uint32_t findQueueFamilies(VkPhysicalDevice physicalDevice, VkQueueFlags desired
     return 0;
 }
 
+bool initVulkanRenderDevice(VulkanInstance& vk, VulkanRenderDevice& vkDev, uint32_t width, uint32_t height, std::function<bool(VkPhysicalDevice)> selector, VkPhysicalDeviceFeatures deviceFeatures) {
+    VK_ASSERT(findSuitablePhysicalDevice(vk.instance, selector, &vkDev.physicalDevice) == VK_SUCCESS);
+
+    vkDev.graphicsFamily = findQueueFamilies(vkDev.physicalDevice, VK_QUEUE_GRAPHICS_BIT);
+
+    VK_ASSERT(createDevice(vkDev.physicalDevice, deviceFeatures, vkDev.graphicsFamily, &vkDev.device) == VK_SUCCESS);
+
+    vkGetDeviceQueue(vkDev.device, vkDev.graphicsFamily, 0, &vkDev.graphicsQueue);
+
+    if (vkDev.graphicsQueue == nullptr)    exit(EXIT_FAILURE);
+
+    VkBool32 presentSupported = 0;
+    vkGetPhysicalDeviceSurfaceSupportKHR(vkDev.physicalDevice, vkDev.graphicsFamily, vk.surface, &presentSupported);
+    if (!presentSupported) exit(EXIT_FAILURE);
+
+    VK_ASSERT(createSwapChain(vkDev.device, vkDev.physicalDevice, vk.surface, vkDev.graphicsFamily, width, height, &vkDev.swapchain) == VK_SUCCESS);
+    const size_t imageCount = createSwapchainImages(vkDev.device, vkDev.swapchain, vkDev.swapchainImages, vkDev.swapchainImageViews);
+    vkDev.commandBuffers.resize(imageCount);
+
+    VK_ASSERT(createSemaphore(vkDev.device, &vkDev.semaphore) == VK_SUCCESS);
+    VK_ASSERT(createSemaphore(vkDev.device, &vkDev.renderSemaphore) == VK_SUCCESS);
+
+    const VkCommandPoolCreateInfo cpi = { 
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,    
+        .flags = 0,    
+        .queueFamilyIndex = vkDev.graphicsFamily 
+    };
+    VK_ASSERT(vkCreateCommandPool(vkDev.device, &cpi, nullptr, &vkDev.commandPool) == VK_SUCCESS);
+
+    const VkCommandBufferAllocateInfo ai = { 
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,     
+        .pNext = nullptr,     
+        .commandPool = vkDev.commandPool,     
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,     
+        .commandBufferCount = (uint32_t)(vkDev.swapchainImages.size())
+    };
+    VK_ASSERT(vkAllocateCommandBuffers(vkDev.device, &ai, vkDev.commandBuffers.data()) == VK_SUCCESS);
+    return true;
+}
+
+void destroyVulkanRenderDevice(VulkanRenderDevice& vkDev)
+{
+    for (size_t i = 0; i < vkDev.swapchainImages.size(); i++)
+        vkDestroyImageView(vkDev.device, vkDev.swapchainImageViews[i], nullptr);
+
+    vkDestroySwapchainKHR(vkDev.device, vkDev.swapchain, nullptr);
+    vkDestroyCommandPool(vkDev.device, vkDev.commandPool, nullptr);
+    vkDestroySemaphore(vkDev.device, vkDev.semaphore, nullptr);
+    vkDestroySemaphore(vkDev.device, vkDev.renderSemaphore, nullptr);
+    vkDestroyDevice(vkDev.device, nullptr);
+}
+
+void destroyVulkanInstance(VulkanInstance& vk)
+{
+    vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
+    vkDestroyDebugReportCallbackEXT(vk.instance, vk.reportCallback, nullptr);
+    vkDestroyDebugUtilsMessengerEXT(vk.instance, vk.messenger, nullptr);
+    vkDestroyInstance(vk.instance, nullptr);
+}
+
 int main()
 {
     const VkApplicationInfo appInfo = {
@@ -230,11 +365,11 @@ int main()
         .ppEnabledExtensionNames = exts.data(),
     };
 
-    VkInstance instance;
-    VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &instance) == VK_SUCCESS);
+    VulkanInstance instance = {};
 
-    volkLoadInstance(instance);
+    VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &instance.instance) == VK_SUCCESS);
 
+    volkLoadInstance(instance.instance);
 
     return 0;
 }
