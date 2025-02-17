@@ -2,6 +2,13 @@
 #include <vector>
 #include <functional>
 
+const uint32_t kScreenWidth = 1280;
+const uint32_t kScreenHeight = 720;
+
+static constexpr VkClearColorValue clearValueColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+VulkanInstance vk;
+VulkanRenderDevice vkDev;
 
 static void VK_ASSERT(bool check) {
     if (!check) exit(EXIT_FAILURE);
@@ -342,6 +349,51 @@ void destroyVulkanInstance(VulkanInstance& vk)
     vkDestroyInstance(vk.instance, nullptr);
 }
 
+bool fillCommandBuffers(size_t i) {
+   /* const VkCommandBufferBeginInfo bi = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = nullptr,
+        .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        .pInheritanceInfo = nullptr
+    };
+    const std::array<VkClearValue, 2> clearValues = { 
+    VkClearValue{.color = clearValueColor},
+    VkClearValue{.depthStencil = {1.0f, 0}}
+    };
+    const VkRect2D 
+        screenRect = { 
+        .offset = { 0, 0 },     
+        .extent = { 
+            .width = kScreenWidth,                 
+            .height = kScreenHeight 
+        }
+    };
+
+    VK_ASSERT(vkBeginCommandBuffer(vkDev.commandBuffers[i], &bi) == VK_SUCCESS);
+
+    const VkRenderPassBeginInfo renderPassInfo = { 
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,    
+        .pNext = nullptr,    
+        .renderPass = vkState.renderPass,    
+        .framebuffer = vkState.swapchainFramebuffers[i],    
+        .renderArea = screenRect,    
+        .clearValueCount = static_cast<uint32_t>(clearValues.size()),    
+        .pClearValues = clearValues.data() 
+    };
+
+    vkCmdBeginRenderPass(vkDev.commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(vkDev.commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vkState.graphicsPipeline);
+
+    vkCmdBindDescriptorSets(vkDev.commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vkState.pipelineLayout, 0, 1, &vkState.descriptorSets[i], 0, nullptr);
+
+    vkCmdDraw(vkDev.commandBuffers[i], static_cast<uint32_t>(indexBufferSize / sizeof(uint32_t)), 1, 0, 0);
+
+    vkCmdEndRenderPass(vkDev.commandBuffers[i]);
+
+    VK_ASSERT(vkEndCommandBuffer(vkDev.commandBuffers[i]) == VK_SUCCESS);*/
+    return true;
+}
 int main()
 {
     const VkApplicationInfo appInfo = {
