@@ -137,12 +137,12 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="VulkanObjects\VulkanInstance.cpp" />
-    <ClCompile Include="VulkanRenderDevice.cpp" />
+    <ClCompile Include="VulkanObjects\VulkanRenderDevice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utils\Utils.h" />
     <ClInclude Include="VulkanObjects\VulkanInstance.h" />
-    <ClInclude Include="VulkanRenderDevice.h" />
+    <ClInclude Include="VulkanObjects\VulkanRenderDevice.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

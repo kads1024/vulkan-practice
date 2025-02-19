@@ -21,7 +21,7 @@
     <ClCompile Include="VulkanObjects\VulkanInstance.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanRenderDevice.cpp">
+    <ClCompile Include="VulkanObjects\VulkanRenderDevice.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,7 +32,7 @@
     <ClInclude Include="Utils\Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="VulkanRenderDevice.h">
+    <ClInclude Include="VulkanObjects\VulkanRenderDevice.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
