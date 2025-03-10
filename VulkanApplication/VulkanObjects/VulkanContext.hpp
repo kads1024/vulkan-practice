@@ -1,4 +1,7 @@
 #pragma once
+#include <string>
+#include <unordered_set>
+
 #include <Volk/volk.h>
 
 class VulkanContext
@@ -17,6 +20,8 @@ private:
     void createInstance();
     void pickPhysicalDevice();
     void createLogicalDevice();
+
+    std::unordered_set<std::string> filterNames(std::vector<std::string> availableNames, std::vector<std::string> requestedNames);
 
     VkInstance m_instance;
     VkPhysicalDevice m_physicalDevice;
