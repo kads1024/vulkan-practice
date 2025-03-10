@@ -1,4 +1,6 @@
-#include "VulkanContext.h"
+#include "VulkanContext.hpp"
+
+#include "Utils.hpp"
 
 VulkanContext::VulkanContext()
 {
@@ -12,6 +14,7 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::initialize()
 {
+	volkInitialize();
 	createInstance();
 }
 
@@ -37,13 +40,10 @@ void VulkanContext::createInstance()
 		.pApplicationInfo = &appInfo
 	};
 
-	if (vkCreateInstance(&createInfo, nullptr, &m_instance) != VK_SUCCESS) {
-		printf("Failed to create instance!");
-		exit(EXIT_FAILURE);
-	}
-	else {
-		printf("Successfully created instance!");
-	}
+	VK_CHECK(vkCreateInstance(&createInfo, nullptr, &m_instance));
+
+	// Volk Loader
+	volkLoadInstance(m_instance);
 }
 
 void VulkanContext::pickPhysicalDevice()
