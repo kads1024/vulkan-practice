@@ -52,4 +52,6 @@ void VulkanContext::pickPhysicalDevice()
 
 void VulkanContext::createLogicalDevice()
 {
+	// Volk Loader
+	volkLoadDevice(m_device);
 }
